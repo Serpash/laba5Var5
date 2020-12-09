@@ -91,3 +91,214 @@ public class GraphicsDisplay extends JPanel {
         this.viewport[1][1] = y2;
         this.repaint();
     }
+    public void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        this.scaleX = this.getSize().getWidth() / (this.viewport[1][0] - this.viewport[0][0]);
+        this.scaleY = this.getSize().getHeight() / (this.viewport[0][1] - this.viewport[1][1]);
+        if (this.graphicsData != null && this.graphicsData.size() != 0) {
+            Graphics2D canvas = (Graphics2D)g;
+            this.paintGrid(canvas);
+            this.paintAxis(canvas);
+            this.paintGraphics(canvas);
+            this.paintMarkers(canvas);
+            this.paintLabels(canvas);
+            this.paintSelection(canvas);
+        }
+    }
+
+    private void paintSelection(Graphics2D canvas) {
+        if (this.scaleMode) {
+            canvas.setStroke(this.selectionStroke);
+            canvas.setColor(Color.BLACK);
+            canvas.draw(this.selectionRect);
+        }
+    }
+
+    private void paintGraphics(Graphics2D canvas) {
+        canvas.setStroke(this.markerStroke);
+        canvas.setColor(Color.RED);
+        Double currentX = null;
+        Double currentY = null;
+        Iterator var5 = this.graphicsData.iterator();
+
+        while(var5.hasNext()) {
+            Double[] point = (Double[])var5.next();
+            if (point[0] >= this.viewport[0][0] && point[1] <= this.viewport[0][1] && point[0] <= this.viewport[1][0] && point[1] >= this.viewport[1][1]) {
+                if (currentX != null && currentY != null) {
+                    canvas.draw(new java.awt.geom.Line2D.Double(this.translateXYtoPoint(currentX, currentY), this.translateXYtoPoint(point[0], point[1])));
+                }
+
+                currentX = point[0];
+                currentY = point[1];
+            }
+        }
+
+    }
+    private void paintMarkers(Graphics2D canvas) {
+        canvas.setStroke(this.markerStroke);
+        canvas.setColor(Color.RED);
+        canvas.setPaint(Color.RED);
+        java.awt.geom.Ellipse2D.Double lastMarker = null;
+        int i = -1;
+        Iterator var5 = this.graphicsData.iterator();
+
+        while(var5.hasNext()) {
+            Double[] point = (Double[])var5.next();
+            ++i;
+            if (point[0] >= this.viewport[0][0] && point[1] <= this.viewport[0][1] && point[0] <= this.viewport[1][0] && point[1] >= this.viewport[1][1]) {
+                byte radius;
+                if (i == this.selectedMarker) {
+                    radius = 6;
+                } else {
+                    radius = 3;
+                }
+
+                java.awt.geom.Ellipse2D.Double marker = new java.awt.geom.Ellipse2D.Double();
+                Point2D center = this.translateXYtoPoint(point[0], point[1]);
+                Point2D corner = new java.awt.geom.Point2D.Double(center.getX() + (double)radius, center.getY() + (double)radius);
+                marker.setFrameFromCenter(center, corner);
+                if (i == this.selectedMarker) {
+                    lastMarker = marker;
+                } else {
+                    canvas.draw(marker);
+                    canvas.fill(marker);
+                }
+            }
+        }
+
+        if (lastMarker != null) {
+            canvas.setColor(Color.BLUE);
+            canvas.setPaint(Color.BLUE);
+            canvas.draw(lastMarker);
+            canvas.fill(lastMarker);
+        }
+
+    }
+
+    private void paintLabels(Graphics2D canvas) {
+        canvas.setColor(Color.BLACK);
+        canvas.setFont(this.labelsFont);
+        FontRenderContext context = canvas.getFontRenderContext();
+        double labelYPos;
+        if (this.viewport[1][1] < 0.0D && this.viewport[0][1] > 0.0D) {
+            labelYPos = 0.0D;
+        } else {
+            labelYPos = this.viewport[1][1];
+        }
+
+        double labelXPos;
+        if (this.viewport[0][0] < 0.0D && this.viewport[1][0] > 0.0D) {
+            labelXPos = 0.0D;
+        } else {
+            labelXPos = this.viewport[0][0];
+        }
+
+        double pos = this.viewport[0][0];
+
+        double step;
+        java.awt.geom.Point2D.Double point;
+        String label;
+        Rectangle2D bounds;
+        for(step = (this.viewport[1][0] - this.viewport[0][0]) / 10.0D; pos < this.viewport[1][0]; pos += step) {
+            point = this.translateXYtoPoint(pos, labelYPos);
+            label = formatter.format(pos);
+            bounds = this.labelsFont.getStringBounds(label, context);
+            canvas.drawString(label, (float)(point.getX() + 5.0D), (float)(point.getY() - bounds.getHeight()));
+        }
+
+        pos = this.viewport[1][1];
+
+        for(step = (this.viewport[0][1] - this.viewport[1][1]) / 10.0D; pos < this.viewport[0][1]; pos += step) {
+            point = this.translateXYtoPoint(labelXPos, pos);
+            label = formatter.format(pos);
+            bounds = this.labelsFont.getStringBounds(label, context);
+            canvas.drawString(label, (float)(point.getX() + 5.0D), (float)(point.getY() - bounds.getHeight()));
+        }
+
+        if (this.selectedMarker >= 0) {
+            point = this.translateXYtoPoint(((Double[])this.graphicsData.get(this.selectedMarker))[0], ((Double[])this.graphicsData.get(this.selectedMarker))[1]);
+            label = "X=" + formatter.format(((Double[])this.graphicsData.get(this.selectedMarker))[0]) + ", Y=" + formatter.format(((Double[])this.graphicsData.get(this.selectedMarker))[1]);
+            bounds = this.labelsFont.getStringBounds(label, context);
+            canvas.setColor(Color.BLUE);
+            canvas.drawString(label, (float)(point.getX() + 5.0D), (float)(point.getY() - bounds.getHeight()));
+        }
+
+    }
+    private void paintGrid(Graphics2D canvas) {
+        canvas.setStroke(this.gridStroke);
+        canvas.setColor(Color.GRAY);
+        double pos = this.viewport[0][0];
+
+        double step;
+        for(step = (this.viewport[1][0] - this.viewport[0][0]) / 10.0D; pos < this.viewport[1][0]; pos += step) {
+            canvas.draw(new java.awt.geom.Line2D.Double(this.translateXYtoPoint(pos, this.viewport[0][1]), this.translateXYtoPoint(pos, this.viewport[1][1])));
+        }
+
+        canvas.draw(new java.awt.geom.Line2D.Double(this.translateXYtoPoint(this.viewport[1][0], this.viewport[0][1]), this.translateXYtoPoint(this.viewport[1][0], this.viewport[1][1])));
+        pos = this.viewport[1][1];
+
+        for(step = (this.viewport[0][1] - this.viewport[1][1]) / 10.0D; pos < this.viewport[0][1]; pos += step) {
+            canvas.draw(new java.awt.geom.Line2D.Double(this.translateXYtoPoint(this.viewport[0][0], pos), this.translateXYtoPoint(this.viewport[1][0], pos)));
+        }
+
+        canvas.draw(new java.awt.geom.Line2D.Double(this.translateXYtoPoint(this.viewport[0][0], this.viewport[0][1]), this.translateXYtoPoint(this.viewport[1][0], this.viewport[0][1])));
+    }
+
+    private void paintAxis(Graphics2D canvas) {
+        canvas.setStroke(this.axisStroke);
+        canvas.setColor(Color.BLACK);
+        canvas.setFont(this.axisFont);
+        FontRenderContext context = canvas.getFontRenderContext();
+        Rectangle2D bounds;
+        java.awt.geom.Point2D.Double labelPos;
+        if (this.viewport[0][0] <= 0.0D && this.viewport[1][0] >= 0.0D) {
+            canvas.draw(new java.awt.geom.Line2D.Double(this.translateXYtoPoint(0.0D, this.viewport[0][1]), this.translateXYtoPoint(0.0D, this.viewport[1][1])));
+            canvas.draw(new java.awt.geom.Line2D.Double(this.translateXYtoPoint(-(this.viewport[1][0] - this.viewport[0][0]) * 0.0025D, this.viewport[0][1] - (this.viewport[0][1] - this.viewport[1][1]) * 0.015D), this.translateXYtoPoint(0.0D, this.viewport[0][1])));
+            canvas.draw(new java.awt.geom.Line2D.Double(this.translateXYtoPoint((this.viewport[1][0] - this.viewport[0][0]) * 0.0025D, this.viewport[0][1] - (this.viewport[0][1] - this.viewport[1][1]) * 0.015D), this.translateXYtoPoint(0.0D, this.viewport[0][1])));
+            bounds = this.axisFont.getStringBounds("y", context);
+            labelPos = this.translateXYtoPoint(0.0D, this.viewport[0][1]);
+            canvas.drawString("y", (float)labelPos.x + 10.0F, (float)(labelPos.y + bounds.getHeight() / 2.0D));
+        }
+
+        if (this.viewport[1][1] <= 0.0D && this.viewport[0][1] >= 0.0D) {
+            canvas.draw(new java.awt.geom.Line2D.Double(this.translateXYtoPoint(this.viewport[0][0], 0.0D), this.translateXYtoPoint(this.viewport[1][0], 0.0D)));
+            canvas.draw(new java.awt.geom.Line2D.Double(this.translateXYtoPoint(this.viewport[1][0] - (this.viewport[1][0] - this.viewport[0][0]) * 0.01D, (this.viewport[0][1] - this.viewport[1][1]) * 0.005D), this.translateXYtoPoint(this.viewport[1][0], 0.0D)));
+            canvas.draw(new java.awt.geom.Line2D.Double(this.translateXYtoPoint(this.viewport[1][0] - (this.viewport[1][0] - this.viewport[0][0]) * 0.01D, -(this.viewport[0][1] - this.viewport[1][1]) * 0.005D), this.translateXYtoPoint(this.viewport[1][0], 0.0D)));
+            bounds = this.axisFont.getStringBounds("x", context);
+            labelPos = this.translateXYtoPoint(this.viewport[1][0], 0.0D);
+            canvas.drawString("x", (float)(labelPos.x - bounds.getWidth() - 10.0D), (float)(labelPos.y - bounds.getHeight() / 2.0D));
+        }
+
+    }
+
+    protected java.awt.geom.Point2D.Double translateXYtoPoint(double x, double y) {
+        double deltaX = x - this.viewport[0][0];
+        double deltaY = this.viewport[0][1] - y;
+        return new java.awt.geom.Point2D.Double(deltaX * this.scaleX, deltaY * this.scaleY);
+    }
+
+    protected double[] translatePointToXY(int x, int y) {
+        return new double[]{this.viewport[0][0] + (double)x / this.scaleX, this.viewport[0][1] - (double)y / this.scaleY};
+    }
+    protected int findSelectedPoint(int x, int y) {
+        if (this.graphicsData == null) {
+            return -1;
+        } else {
+            int pos = 0;
+
+            for(Iterator var5 = this.graphicsData.iterator(); var5.hasNext(); ++pos) {
+                Double[] point = (Double[])var5.next();
+                java.awt.geom.Point2D.Double screenPoint = this.translateXYtoPoint(point[0], point[1]);
+                double distance = (screenPoint.getX() - (double)x) * (screenPoint.getX() - (double)x) + (screenPoint.getY() - (double)y) * (screenPoint.getY() - (double)y);
+                if (distance < 100.0D) {
+                    return pos;
+                }
+            }
+
+            return -1;
+        }
+    }
+
+    public void reset() {
+        this.displayGraphics(this.originalData);
+    }
